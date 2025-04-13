@@ -22,10 +22,21 @@ class BatchFileLauncher(QWidget):
         title.setStyleSheet("color: white;")
         layout.addWidget(title)
 
-        current_dir = os.getcwd()
+        # Путь к папке scripts
+        script_dir = os.path.join(os.getcwd(), "scripts")
 
+        # Проверяем, существует ли папка scripts
+        if not os.path.exists(script_dir):
+            no_files_label = QLabel("Папка 'scripts' не найдена.")
+            no_files_label.setFont(QFont("Arial", 12))
+            no_files_label.setStyleSheet("color: white;")
+            no_files_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(no_files_label)
+            return
+
+        # Поиск .bat файлов в папке scripts
         batch_files = [
-            file for file in os.listdir(current_dir)
+            file for file in os.listdir(script_dir)
             if file.endswith(".bat") and not file.startswith("service")
         ]
 
@@ -46,10 +57,11 @@ class BatchFileLauncher(QWidget):
                         background-color: #45a049;
                     }
                 """)
-                button.clicked.connect(lambda checked, b=batch_file: self.run_batch_file(b))
+                # Передаём полный путь к bat-файлу в обработчик нажатия
+                button.clicked.connect(lambda checked, b=os.path.join(script_dir, batch_file): self.run_batch_file(b))
                 layout.addWidget(button)
         else:
-            no_files_label = QLabel("Файлы .bat не найдены.")
+            no_files_label = QLabel("Файлы .bat в папке 'scripts' не найдены.")
             no_files_label.setFont(QFont("Arial", 12))
             no_files_label.setStyleSheet("color: white;")
             no_files_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -76,13 +88,13 @@ class BatchFileLauncher(QWidget):
         """Запуск BAT файла с правами администратора"""
         try:
             subprocess.run(
-                f'powershell Start-Process cmd -ArgumentList \'/c {batch_file}\' -Verb runAs',
+                f'powershell Start-Process cmd -ArgumentList \'/c "{batch_file}"\' -Verb runAs',
                 check=True,
                 shell=True
             )
             QMessageBox.information(self, "Успех", f"Файл {batch_file} успешно запущен.")
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Что то не так(.\n{str(e)}")
+            QMessageBox.critical(self, "Ошибка", f"Что-то пошло не так.\n{str(e)}")
 
 
 def is_user_admin():
