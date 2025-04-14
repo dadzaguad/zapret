@@ -110,38 +110,90 @@ def _run_check_updates():
 # --- Основная функция для запуска команд ---
 def run_zapret_command(command_name: str):
     """
-    Запускает выбранную команду zapret (предварительно выполнив check_updates.bat).
+    Запускает выбранную команду zapret с помощью 'start' в фоновом режиме,
+    не дожидаясь завершения winws.exe.
 
     Args:
         command_name: Имя команды (ключ из словаря COMMAND_ARGS).
 
-    Returns:
-        True, если команда успешно передана 'start', False в случае ошибки.
+    Raises:
+        FileNotFoundError: Если winws.exe не найден.
+        Exception: Другие ошибки при попытке запуска.
     """
     print(f"\nПопытка запуска профиля: '{command_name}'")
 
-    # Проверяем, существует ли такая команда в нашем словаре
-    if command_name not in COMMAND_ARGS:
-        print(f"Ошибка: Профиль '{command_name}' не найден.", file=sys.stderr)
-        print(f"Доступные профили: {list(COMMAND_ARGS.keys())}", file=sys.stderr)
+
+    try:
+        winws_args = COMMAND_ARGS[command_name]
+        winws_exe_path = os.path.join(BIN_PATH, 'winws.exe')
+
+        # Добавим явную проверку существования winws.exe перед запуском
+        if not os.path.exists(winws_exe_path):
+            print(f"Ошибка: Файл '{winws_exe_path}' не найден!", file=sys.stderr)
+            # Вызываем исключение, чтобы worker узнал об ошибке
+            raise FileNotFoundError(f"Исполняемый файл '{winws_exe_path}' не найден!")
+
+        full_command = f'start "zapret: {command_name}" /min "{winws_exe_path}" {winws_args}'
+        command_cleaned = " ".join(full_command.split())
+
+        print(f"Выполнение (Popen): {command_cleaned}")
+
+        # Используем Popen для неблокирующего запуска в фоне
+        subprocess.Popen(
+            command_cleaned,
+            shell=True,         # Нужно для команды 'start'
+            cwd=SCRIPT_DIR,     # Устанавливаем рабочую директорию
+            # Следующие флаги помогают отсоединить процесс от родительского (Python скрипта)
+            # Особенно актуально для Windows при использовании shell=True
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
+            stdout=subprocess.DEVNULL, # Перенаправляем вывод, чтобы не ждать его
+            stderr=subprocess.DEVNULL  # Перенаправляем ошибки, чтобы не ждать их
+        )
+        # Popen возвращает управление немедленно после запуска команды 'start'
+        print(f"Команда '{command_name}' передана системе для запуска.")
+        # Функция теперь успешно завершается, не дожидаясь winws.exe
+
+    except FileNotFoundError as e: # Ловим ошибку если winws.exe не найден
+        print(f"Ошибка FileNotFoundError при подготовке к запуску: {e}", file=sys.stderr)
+        raise # Передаем исключение дальше, чтобы worker поймал
+
+    except Exception as e:
+        print(f"Неожиданная ошибка при попытке запуска команды '{command_name}': {e}", file=sys.stderr)
+        # Передаем исключение дальше, чтобы worker мог его обработать
+        raise
+
+def stop_process(process_name):
+    """Останавливает процесс по имени исполняемого файла с помощью taskkill."""
+    print(f"Попытка остановить процесс: {process_name}")
+
+    try:
+        # Команда для принудительного завершения процесса по имени
+        # /F - принудительное завершение
+        # /IM - указание имени образа (исполняемого файла)
+        # /T - завершить процесс и все его дочерние процессы (на всякий случай)
+        cmd = f'taskkill /F /IM "{process_name}" /T'
+        print(f"Выполнение команды: {cmd}")
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, encoding='cp866', errors='ignore', check=False)
+
+        # Проверяем вывод команды taskkill
+        output = result.stdout + result.stderr
+        # print(f"DEBUG: Taskkill output:\n{output}") # Для отладки
+
+        if result.returncode == 0 or "успех" in output.lower() or "success" in output.lower():
+            print(f"Команда taskkill успешно выполнена для {process_name}.")
+            return True
+        elif "не найден" in output.lower() or "not found" in output.lower():
+             print(f"Процесс {process_name} не был найден командой taskkill (возможно, уже остановлен).")
+             return True # Считаем успехом, если его и так нет
+        else:
+            print(f"Ошибка при выполнении taskkill для {process_name}.")
+            print(f"Код возврата: {result.returncode}")
+            print(f"Вывод taskkill:\n{output}")
+            return False
+
+    except FileNotFoundError:
+        print(f"Ошибка: Команда 'taskkill' не найдена. Убедитесь, что она доступна в PATH.")
         return False
-
-    if not _run_check_updates():
-        print("Запуск основной команды отменен из-за ошибки в check_updates.bat.", file=sys.stderr)
+    except Exception as e:
+        print(f"Непредвиденная ошибка при остановке {process_name}: {e}")
         return False
-
-    winws_args = COMMAND_ARGS[command_name] # Получаем аргументы для выбранной команды
-    winws_exe_path = os.path.join(BIN_PATH, 'winws.exe') # Полный путь к winws.exe
-
-    full_command = f'start "zapret: {command_name}" /min "{winws_exe_path}" {winws_args}'
-
-    # Очищаем команду от лишних пробелов и переносов строк
-    command_cleaned = " ".join(full_command.split())
-
-    subprocess.run(
-        command_cleaned,
-        shell=True,  # Необходимо для команды 'start'
-        check=True,  # Проверка кода возврата cmd.exe
-        cwd=SCRIPT_DIR,  # Рабочая директория - папка скрипта
-        capture_output=True  # Подавляем вывод 'start'
-    )
