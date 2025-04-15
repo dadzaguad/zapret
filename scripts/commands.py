@@ -1,9 +1,10 @@
 import subprocess
 import os
 import sys
+import ctypes
 
 # --- Конфигурация путей ---
-# Определяем директорию, где находится ЭТОТ файл (zapret_runner.py)
+# Определяем директорию, где находится ЭТОТ файл
 # Предполагается, что check_updates.bat, папка bin/, list-general.txt и т.д.
 # находятся в той же директории или имеют ту же относительную структуру.
 try:
@@ -112,55 +113,31 @@ def run_zapret_command(command_name: str):
     """
     Запускает выбранную команду zapret с помощью 'start' в фоновом режиме,
     не дожидаясь завершения winws.exe.
-
-    Args:
-        command_name: Имя команды (ключ из словаря COMMAND_ARGS).
-
-    Raises:
-        FileNotFoundError: Если winws.exe не найден.
-        Exception: Другие ошибки при попытке запуска.
     """
+
     print(f"\nПопытка запуска профиля: '{command_name}'")
 
+    winws_args = COMMAND_ARGS[command_name]
+    winws_exe_path = os.path.join(BIN_PATH, 'winws.exe')
 
-    try:
-        winws_args = COMMAND_ARGS[command_name]
-        winws_exe_path = os.path.join(BIN_PATH, 'winws.exe')
+    full_command = f'start "zapret: {command_name}" /min "{winws_exe_path}" {winws_args}'
+    command_cleaned = " ".join(full_command.split())
 
-        # Добавим явную проверку существования winws.exe перед запуском
-        if not os.path.exists(winws_exe_path):
-            print(f"Ошибка: Файл '{winws_exe_path}' не найден!", file=sys.stderr)
-            # Вызываем исключение, чтобы worker узнал об ошибке
-            raise FileNotFoundError(f"Исполняемый файл '{winws_exe_path}' не найден!")
 
-        full_command = f'start "zapret: {command_name}" /min "{winws_exe_path}" {winws_args}'
-        command_cleaned = " ".join(full_command.split())
+    # Используем Popen для неблокирующего запуска в фоне
+    subprocess.Popen(
+        command_cleaned,
+        shell=True,         # Нужно для команды 'start'
+        cwd=SCRIPT_DIR,     # Устанавливаем рабочую директорию
+        # Следующие флаги помогают отсоединить процесс от родительского (Python скрипта)
+        # Особенно актуально для Windows при использовании shell=True
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
+        stdout=subprocess.DEVNULL, # Перенаправляем вывод, чтобы не ждать его
+        stderr=subprocess.DEVNULL  # Перенаправляем ошибки, чтобы не ждать их
+    )
+    # Popen возвращает управление немедленно после запуска команды 'start'
+    print(f"Команда '{command_name}' передана системе для запуска.")
 
-        print(f"Выполнение (Popen): {command_cleaned}")
-
-        # Используем Popen для неблокирующего запуска в фоне
-        subprocess.Popen(
-            command_cleaned,
-            shell=True,         # Нужно для команды 'start'
-            cwd=SCRIPT_DIR,     # Устанавливаем рабочую директорию
-            # Следующие флаги помогают отсоединить процесс от родительского (Python скрипта)
-            # Особенно актуально для Windows при использовании shell=True
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
-            stdout=subprocess.DEVNULL, # Перенаправляем вывод, чтобы не ждать его
-            stderr=subprocess.DEVNULL  # Перенаправляем ошибки, чтобы не ждать их
-        )
-        # Popen возвращает управление немедленно после запуска команды 'start'
-        print(f"Команда '{command_name}' передана системе для запуска.")
-        # Функция теперь успешно завершается, не дожидаясь winws.exe
-
-    except FileNotFoundError as e: # Ловим ошибку если winws.exe не найден
-        print(f"Ошибка FileNotFoundError при подготовке к запуску: {e}", file=sys.stderr)
-        raise # Передаем исключение дальше, чтобы worker поймал
-
-    except Exception as e:
-        print(f"Неожиданная ошибка при попытке запуска команды '{command_name}': {e}", file=sys.stderr)
-        # Передаем исключение дальше, чтобы worker мог его обработать
-        raise
 
 def stop_process(process_name):
     """Останавливает процесс по имени исполняемого файла с помощью taskkill."""

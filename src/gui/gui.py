@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from PyQt6.QtGui import QCloseEvent
+import ctypes
 
 # Импорт вашего модуля команд
 script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts'))
@@ -23,10 +24,32 @@ except ImportError as e:
     sys.exit(1)
 
 
+def is_admin():
+    """Проверяет, запущено ли приложение с правами администратора."""
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except Exception:
+        return False
+
+
+def restart_as_admin():
+    """Перезапускает текущее приложение с правами администратора без консоли."""
+    try:
+        script = os.path.abspath(sys.argv[0])
+        params = ' '.join(f'"{arg}"' for arg in sys.argv[1:])
+        # Используем pythonw.exe для скрытия консоли
+        pythonw_exe = sys.executable.replace('python.exe', 'pythonw.exe')  # Заменяем на pythonw.exe
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", pythonw_exe, f'"{script}" {params}', None, 1)
+    except Exception as e:
+        QMessageBox.critical(None, "Ошибка прав администратора",
+                             f"Не удалось перезапустить программу с правами администратора:\n{e}")
+    sys.exit(1)
+
+
 class CommandWorker(QObject):
     command_started = pyqtSignal(str)
     process_stopped = pyqtSignal(str)
-    error_occurred = pyqtSignal(str, str) # message, command_name (None if stop error)
+    error_occurred = pyqtSignal(str, str)  # message, command_name (None if stop error)
     finished = pyqtSignal()
 
     def __init__(self, command_name=None, process_name=None):
@@ -55,18 +78,19 @@ class CommandWorker(QObject):
         try:
             success_flag = commands.stop_process(self._process_name)
             if success_flag:
-                 self.process_stopped.emit(f"Попытка остановки '{self._process_name}' завершена.")
+                self.process_stopped.emit(f"Попытка остановки '{self._process_name}' завершена.")
             else:
-                 self.error_occurred.emit(f"Не удалось остановить '{self._process_name}'.\n(См. консоль)", None)
+                self.error_occurred.emit(f"Не удалось остановить '{self._process_name}'.\n(См. консоль)", None)
         except Exception as e:
             self.error_occurred.emit(f"Ошибка при остановке '{self._process_name}':\n{e}", None)
         finally:
             self.finished.emit()
 
+
 # --- Основной класс приложения ---
 class CommandRunnerApp(QWidget):
     RUNNING_STYLE = "background-color: lightgreen; color: black;"
-    DEFAULT_STYLE = "" # Пустая строка сбрасывает стиль к значению по умолчанию
+    DEFAULT_STYLE = ""  # Пустая строка сбрасывает стиль к значению по умолчанию
 
     def __init__(self):
         super().__init__()
@@ -106,61 +130,47 @@ class CommandRunnerApp(QWidget):
     # --- Методы управления состоянием UI ---
 
     def _set_ui_state_can_start(self):
-        """Состояние: Готово к запуску любой команды."""
-        # Сбрасываем выделение предыдущей кнопки (если была)
         if self.running_command_name:
             button = self.command_buttons.get(self.running_command_name)
             if button:
                 button.setStyleSheet(self.DEFAULT_STYLE)
 
-        self.running_command_name = None # Сбрасываем имя запущенной команды
-        # Включаем все кнопки команд
+        self.running_command_name = None
         for button in self.command_buttons.values():
             button.setEnabled(True)
         self.stop_button.setEnabled(True)
-        self.stop_button.setStyleSheet("background-color: #5c0a0a;") # Возвращаем цвет
 
     def _set_ui_state_can_stop(self, command_name):
-        """Состояние: Одна команда запущена, можно только остановить."""
-        # Сбрасываем стиль старой кнопки, если вдруг что-то пошло не так
         if self.running_command_name and self.running_command_name != command_name:
-             old_button = self.command_buttons.get(self.running_command_name)
-             if old_button:
-                 old_button.setStyleSheet(self.DEFAULT_STYLE)
+            old_button = self.command_buttons.get(self.running_command_name)
+            if old_button:
+                old_button.setStyleSheet(self.DEFAULT_STYLE)
 
-        self.running_command_name = command_name # Устанавливаем имя запущенной команды
-        # Выключаем все кнопки команд
+        self.running_command_name = command_name
         for btn_name, button in self.command_buttons.items():
             if btn_name == command_name:
-                button.setEnabled(True) # Оставляем активной только запущенную
-                button.setStyleSheet(self.RUNNING_STYLE) # Применяем стиль
+                button.setEnabled(True)
+                button.setStyleSheet(self.RUNNING_STYLE)
             else:
-                button.setEnabled(False) # Остальные выключаем
-                button.setStyleSheet(self.DEFAULT_STYLE) # Сбрасываем стиль на всякий случай
-        # Включаем кнопку Стоп
+                button.setEnabled(False)
+                button.setStyleSheet(self.DEFAULT_STYLE)
         self.stop_button.setEnabled(True)
-        self.stop_button.setStyleSheet("background-color: #800000;") # Можно сделать ярче
+        self.stop_button.setStyleSheet("background-color: #800000;")
 
     def _set_ui_state_busy(self, operation_type="start"):
-        """Состояние: Выполняется операция (старт/стоп), все неактивно."""
         for button in self.command_buttons.values():
             button.setEnabled(False)
         self.stop_button.setEnabled(False)
-        # Можно добавить label "Выполняется..."
 
     # --- Методы запуска/остановки ---
 
     def run_selected_command(self, command_name):
-        """Запускает выбранную команду, если никакая другая не запущена."""
         if self.running_command_name is not None:
-            # Эта проверка не должна срабатывать из-за управления состоянием кнопок,
-            # но оставим на всякий случай
             QMessageBox.warning(self, "Запрещено",
                                 f"Команда '{self.running_command_name}' уже выполняется.")
             return
 
-        self._set_ui_state_busy("start") # Блокируем UI на время старта потока
-
+        self._set_ui_state_busy("start")
         thread = QThread()
         worker = CommandWorker(command_name=command_name)
         worker.moveToThread(thread)
@@ -170,7 +180,6 @@ class CommandRunnerApp(QWidget):
         thread.started.connect(worker.run_command)
         worker.command_started.connect(self.on_command_started)
         worker.error_occurred.connect(self.on_task_error)
-        # finished нужен только для очистки
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(lambda: self.active_threads.discard(thread))
@@ -179,14 +188,11 @@ class CommandRunnerApp(QWidget):
         thread.start()
 
     def stop_current_command(self):
-        """Запускает остановку текущего процесса."""
         if self.running_command_name is None:
-            # Эта проверка тоже не должна срабатывать при правильном UI state
-             QMessageBox.information(self, "Информация", "Нет активной команды для остановки.")
-             return
+            QMessageBox.information(self, "Информация", "Нет активной команды для остановки.")
+            return
 
-        self._set_ui_state_busy("stop") # Блокируем UI на время старта потока
-
+        self._set_ui_state_busy("stop")
         thread = QThread()
         worker = CommandWorker(process_name="winws.exe")
         worker.moveToThread(thread)
@@ -196,7 +202,6 @@ class CommandRunnerApp(QWidget):
         thread.started.connect(worker.stop_command)
         worker.process_stopped.connect(self.on_process_stopped)
         worker.error_occurred.connect(self.on_task_error)
-        # finished нужен только для очистки
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(lambda: self.active_threads.discard(thread))
@@ -207,33 +212,23 @@ class CommandRunnerApp(QWidget):
     # --- Слоты для обработки сигналов от Worker ---
 
     def on_command_started(self, started_command_name):
-        """Слот: команда успешно передана для запуска."""
-        # Переключаем UI в состояние "можно остановить"
         self._set_ui_state_can_stop(started_command_name)
 
     def on_process_stopped(self, success_message):
-        """Слот: процесс успешно остановлен (или не найден)."""
         QMessageBox.information(self, "Остановка завершена", success_message)
-        # Переключаем UI в состояние "можно запускать"
         self._set_ui_state_can_start()
 
     def on_task_error(self, error_message, command_name):
-        """Слот: произошла ошибка при запуске или остановке."""
         QMessageBox.warning(self, "Ошибка", error_message)
-        # Возвращаем UI в предыдущее рабочее состояние
-        if command_name is not None: # Ошибка при запуске
+        if command_name is not None:
             self._set_ui_state_can_start()
-        else: # Ошибка при остановке
-            # Восстанавливаем состояние "можно остановить", т.к. команда могла не остановиться
+        else:
             if self.running_command_name:
-                 self._set_ui_state_can_stop(self.running_command_name)
+                self._set_ui_state_can_stop(self.running_command_name)
             else:
-                 # Если running_command_name почему-то None, просто возвращаем в старт
-                 self._set_ui_state_can_start()
+                self._set_ui_state_can_start()
 
-    # --- Обработка закрытия окна ---
     def closeEvent(self, event: QCloseEvent):
-        """Переопределенный метод, вызывается при закрытии окна."""
         reply = QMessageBox.question(self, 'Подтверждение',
                                      "Завершить работу и остановить процесс 'winws.exe'?",
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -241,20 +236,24 @@ class CommandRunnerApp(QWidget):
 
         if reply == QMessageBox.StandardButton.Yes:
             if self.running_command_name:
-                 button = self.command_buttons.get(self.running_command_name)
-                 if button:
-                     button.setStyleSheet(self.DEFAULT_STYLE)
+                button = self.command_buttons.get(self.running_command_name)
+                if button:
+                    button.setStyleSheet(self.DEFAULT_STYLE)
             try:
                 commands.stop_process("winws.exe")
             except Exception as e:
-                 QMessageBox.critical(self, "Ошибка при закрытии",
-                                      f"Не удалось остановить winws.exe:\n{e}")
+                QMessageBox.critical(self, "Ошибка при закрытии",
+                                     f"Не удалось остановить winws.exe:\n{e}")
             self.running_command_name = None
             event.accept()
         else:
             event.ignore()
 
+
 if __name__ == '__main__':
+    if not is_admin():
+        restart_as_admin()
+
     app = QApplication(sys.argv)
     window = CommandRunnerApp()
     window.show()
