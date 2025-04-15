@@ -1,0 +1,58 @@
+name: Build and Release EXE
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.13
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller # Установка PyInstaller
+        pip install -r requirements.txt
+
+    - name: Build EXE
+      run: |
+        pyinstaller --onefile --noconsole --paths=src --add-data "src/scripts/bin;src/scripts/bin" --add-data "src/scripts/*.txt;src/scripts" --icon=icon.ico main.py
+      shell: bash
+
+    - name: Archive EXE
+      run: |
+        mkdir dist-artifacts
+        mv dist/main.exe dist-artifacts/
+      shell: bash
+
+    - name: Upload EXE as release artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: main-exe
+        path: dist-artifacts/main.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download artifact from build job
+      uses: actions/download-artifact@v3
+      with:
+        name: main-exe
+
+    - name: Publish release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist-artifacts/main.exe
