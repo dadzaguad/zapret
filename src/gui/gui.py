@@ -6,44 +6,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from PyQt6.QtGui import QCloseEvent
-import ctypes
 
 # Импорт вашего модуля команд
-script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts'))
-if script_dir not in sys.path:
-    sys.path.append(script_dir)
-
-try:
-    import commands
-except ImportError as e:
-    app_temp = QApplication.instance()
-    if app_temp is None:
-        app_temp = QApplication([sys.argv[0]] if sys.argv else [''])
-    QMessageBox.critical(None, "Ошибка импорта",
-                         f"Не удалось импортировать 'commands.py'.\n{e}")
-    sys.exit(1)
-
-
-def is_admin():
-    """Проверяет, запущено ли приложение с правами администратора."""
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except Exception:
-        return False
-
-
-def restart_as_admin():
-    """Перезапускает текущее приложение с правами администратора без консоли."""
-    try:
-        script = os.path.abspath(sys.argv[0])
-        params = ' '.join(f'"{arg}"' for arg in sys.argv[1:])
-        # Используем pythonw.exe для скрытия консоли
-        pythonw_exe = sys.executable.replace('python.exe', 'pythonw.exe')  # Заменяем на pythonw.exe
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", pythonw_exe, f'"{script}" {params}', None, 1)
-    except Exception as e:
-        QMessageBox.critical(None, "Ошибка прав администратора",
-                             f"Не удалось перезапустить программу с правами администратора:\n{e}")
-    sys.exit(1)
+from src.scripts import commands
+from src.core.admin_utils import is_admin, restart_as_admin
 
 
 class CommandWorker(QObject):
@@ -71,20 +37,16 @@ class CommandWorker(QObject):
             self.finished.emit()
 
     def stop_command(self):
+        """Функция для остановки процесса по имени."""
         if not self._process_name:
             self.error_occurred.emit("Worker: Не указано имя процесса.", None)
-            self.finished.emit()
-            return
-        try:
+        else:
             success_flag = commands.stop_process(self._process_name)
             if success_flag:
-                self.process_stopped.emit(f"Попытка остановки '{self._process_name}' завершена.")
+                self.process_stopped.emit(f"Процесс '{self._process_name}' завершил работу.")
             else:
-                self.error_occurred.emit(f"Не удалось остановить '{self._process_name}'.\n(См. консоль)", None)
-        except Exception as e:
-            self.error_occurred.emit(f"Ошибка при остановке '{self._process_name}':\n{e}", None)
-        finally:
-            self.finished.emit()
+                self.error_occurred.emit(f"Не удалось остановить '{self._process_name}'.", None)
+        self.finished.emit()
 
 
 # --- Основной класс приложения ---
@@ -230,7 +192,7 @@ class CommandRunnerApp(QWidget):
 
     def closeEvent(self, event: QCloseEvent):
         reply = QMessageBox.question(self, 'Подтверждение',
-                                     "Завершить работу и остановить процесс 'winws.exe'?",
+                                     "Завершить работу?",
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                      QMessageBox.StandardButton.No)
 
