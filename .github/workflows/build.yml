@@ -1,58 +1,65 @@
-name: Build and Release EXE
+name: Build and Release Application
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller # Установка PyInstaller
-        pip install -r requirements.txt
+      # Установите зависимости проекта (включая pyinstaller)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install pyinstaller
 
-    - name: Build EXE
-      run: |
-        pyinstaller --onefile --noconsole --paths=src --add-data "src/scripts/bin;src/scripts/bin" --add-data "src/scripts/*.txt;src/scripts" --icon=icon.ico main.py
-      shell: cmd
+      # Соберите приложение с помощью PyInstaller
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --noconsole --paths=src --add-data "src/scripts/bin;src/scripts/bin" --add-data "src/scripts/*.txt;src/scripts" --icon=icon.ico main.py
 
-    - name: Archive EXE
-      run: |
-        mkdir dist-artifacts
-        move dist\main.exe dist-artifacts\main.exe
-      shell: cmd
-
-    - name: Upload EXE as release artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: main-exe
-        path: dist-artifacts/main.exe
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: application-build
+          path: dist/main.exe
 
   release:
     needs: build
     runs-on: ubuntu-latest
-
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
-    - name: Download artifact from build job
-      uses: actions/download-artifact@v4
-      with:
-        name: main-exe
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: application-build
 
-    - name: Publish release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: dist-artifacts/main.exe
+      - name: Publish to GitHub Releases
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            Автоматический релиз собран с использованием GitHub Actions.
+          draft: false
+          prerelease: false
+
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/main.exe
+          asset_name: my_application.exe
+          asset_content_type: application/octet-stream
