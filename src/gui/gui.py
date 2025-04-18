@@ -1,15 +1,17 @@
-import sys
-import os
 from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox, QLabel,
-    QScrollArea
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QPushButton,
+    QMessageBox,
+    QLabel,
+    QScrollArea,
 )
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from PyQt6.QtGui import QCloseEvent
 
 # Импорт вашего модуля команд
 from src.scripts import commands
-from src.core.admin_utils import is_admin, restart_as_admin
 
 
 class CommandWorker(QObject):
@@ -25,14 +27,18 @@ class CommandWorker(QObject):
 
     def run_command(self):
         if not self._command_name:
-            self.error_occurred.emit("Worker: Не указано имя команды.", self._command_name)
+            self.error_occurred.emit(
+                "Worker: Не указано имя команды.", self._command_name
+            )
             self.finished.emit()
             return
         try:
             commands.run_zapret_command(self._command_name)
             self.command_started.emit(self._command_name)
         except Exception as e:
-            self.error_occurred.emit(f"Ошибка при запуске '{self._command_name}':\n{e}", self._command_name)
+            self.error_occurred.emit(
+                f"Ошибка при запуске '{self._command_name}':\n{e}", self._command_name
+            )
         finally:
             self.finished.emit()
 
@@ -43,9 +49,13 @@ class CommandWorker(QObject):
         else:
             success_flag = commands.stop_process(self._process_name)
             if success_flag:
-                self.process_stopped.emit(f"Процесс '{self._process_name}' завершил работу.")
+                self.process_stopped.emit(
+                    f"Процесс '{self._process_name}' завершил работу."
+                )
             else:
-                self.error_occurred.emit(f"Не удалось остановить '{self._process_name}'.", None)
+                self.error_occurred.emit(
+                    f"Не удалось остановить '{self._process_name}'.", None
+                )
         self.finished.emit()
 
 
@@ -56,7 +66,7 @@ class CommandRunnerApp(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Менеджер')
+        self.setWindowTitle("Менеджер")
         self.setGeometry(200, 200, 400, 400)
         self.main_layout = QVBoxLayout(self)
         self.active_threads = set()
@@ -71,7 +81,9 @@ class CommandRunnerApp(QWidget):
 
         for command_name in commands.COMMAND_ARGS.keys():
             button = QPushButton(command_name)
-            button.clicked.connect(lambda checked, name=command_name: self.run_selected_command(name))
+            button.clicked.connect(
+                lambda checked, name=command_name: self.run_selected_command(name)
+            )
             cmd_layout.addWidget(button)
             self.command_buttons[command_name] = button
 
@@ -100,7 +112,7 @@ class CommandRunnerApp(QWidget):
         self.running_command_name = None
         for button in self.command_buttons.values():
             button.setEnabled(True)
-        self.stop_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
 
     def _set_ui_state_can_stop(self, command_name):
         if self.running_command_name and self.running_command_name != command_name:
@@ -128,8 +140,11 @@ class CommandRunnerApp(QWidget):
 
     def run_selected_command(self, command_name):
         if self.running_command_name is not None:
-            QMessageBox.warning(self, "Запрещено",
-                                f"Команда '{self.running_command_name}' уже выполняется.")
+            QMessageBox.warning(
+                self,
+                "Запрещено",
+                f"Команда '{self.running_command_name}' уже выполняется.",
+            )
             return
 
         self._set_ui_state_busy("start")
@@ -151,7 +166,9 @@ class CommandRunnerApp(QWidget):
 
     def stop_current_command(self):
         if self.running_command_name is None:
-            QMessageBox.information(self, "Информация", "Нет активной команды для остановки.")
+            QMessageBox.information(
+                self, "Информация", "Нет активной команды для остановки."
+            )
             return
 
         self._set_ui_state_busy("stop")
@@ -191,10 +208,13 @@ class CommandRunnerApp(QWidget):
                 self._set_ui_state_can_start()
 
     def closeEvent(self, event: QCloseEvent):
-        reply = QMessageBox.question(self, 'Подтверждение',
-                                     "Завершить работу?",
-                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                                     QMessageBox.StandardButton.No)
+        reply = QMessageBox.question(
+            self,
+            "Подтверждение",
+            "Завершить работу?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
 
         if reply == QMessageBox.StandardButton.Yes:
             if self.running_command_name:
@@ -204,19 +224,12 @@ class CommandRunnerApp(QWidget):
             try:
                 commands.stop_process("winws.exe")
             except Exception as e:
-                QMessageBox.critical(self, "Ошибка при закрытии",
-                                     f"Не удалось остановить winws.exe:\n{e}")
+                QMessageBox.critical(
+                    self,
+                    "Ошибка при закрытии",
+                    f"Не удалось остановить winws.exe:\n{e}",
+                )
             self.running_command_name = None
             event.accept()
         else:
             event.ignore()
-
-
-if __name__ == '__main__':
-    if not is_admin():
-        restart_as_admin()
-
-    app = QApplication(sys.argv)
-    window = CommandRunnerApp()
-    window.show()
-    sys.exit(app.exec())
