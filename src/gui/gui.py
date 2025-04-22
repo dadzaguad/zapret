@@ -131,7 +131,16 @@ class CommandRunnerApp(QWidget):
 
         self._set_ui_state_can_start()
 
-    # --- Методы управления состоянием UI ---
+    def show_normal(self) -> None:
+        """Восстановление окна из трея"""
+        self.show()
+        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
+        self.activateWindow()
+
+    def tray_icon_clicked(self, reason) -> None:
+        """Обработка кликов по иконке в трее"""
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self.show_normal()
 
     def _set_ui_state_can_start(self):
         if self.running_command_name:
