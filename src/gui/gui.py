@@ -142,7 +142,30 @@ class CommandRunnerApp(QWidget):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.show_normal()
 
-    def _set_ui_state_can_start(self):
+    def changeEvent(self, event) -> None:
+        """Обработка изменения состояния окна (сворачивание)"""
+        if event.type() == QEvent.Type.WindowStateChange:
+            if self.isMinimized():
+                self.hide()
+                self.tray_icon.showMessage(
+                    "Приложение свернуто",
+                    "Приложение продолжает работать в системном трее",
+                    QSystemTrayIcon.MessageIcon.Information,
+                    2000
+                )
+        super().changeEvent(event)
+
+    def handle_command_button(self, command_name: str) -> None:
+        if self.running_command_name == command_name:
+            self._stop_current_command()
+        else:
+            if self.running_command_name:
+                self.pending_command = command_name
+                self._stop_current_command()
+            else:
+                self._run_selected_command(command_name)
+
+    def _set_ui_state_can_start(self) -> None:
         if self.running_command_name:
             button = self.command_buttons.get(self.running_command_name)
             if button:
