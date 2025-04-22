@@ -245,15 +245,26 @@ class CommandRunnerApp(QWidget):
                 self._set_ui_state_can_start()
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        """Обработка закрытия приложения"""
         if self.running_command_name:
-            reply = QMessageBox.question(
-                self,
-                "Подтверждение",
-                "Вы уверены, что хотите выйти? Некоторые процессы могут быть остановлены.",
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Подтверждение")
+            msg.setText("Вы уверены, что хотите выйти? Некоторые процессы могут быть остановлены.")
+            msg.setIcon(QMessageBox.Icon.Question)
+            msg.setStandardButtons(
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            if reply == QMessageBox.StandardButton.No:
+            msg.setDefaultButton(QMessageBox.StandardButton.No)
+
+            yes_btn = msg.button(QMessageBox.StandardButton.Yes)
+            no_btn = msg.button(QMessageBox.StandardButton.No)
+            yes_btn.setMinimumWidth(50)
+            no_btn.setMinimumWidth(50)
+
+            yes_btn.setMinimumHeight(20)
+            no_btn.setMinimumHeight(20)
+
+            result = msg.exec()
+            if result == QMessageBox.StandardButton.No:
                 event.ignore()
                 return
 
