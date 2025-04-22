@@ -42,21 +42,14 @@ class CommandWorker(QObject):
         finally:
             self.finished.emit()
 
-    def stop_command(self):
-        """Функция для остановки процесса по имени."""
-        if not self._process_name:
-            self.error_occurred.emit("Worker: Не указано имя процесса.", None)
-        else:
-            success_flag = commands.stop_process(self._process_name)
-            if success_flag:
-                self.process_stopped.emit(
-                    f"Процесс '{self._process_name}' завершил работу."
-                )
-            else:
-                self.error_occurred.emit(
-                    f"Не удалось остановить '{self._process_name}'.", None
-                )
-        self.finished.emit()
+    def stop_command(self) -> None:
+        try:
+            self._zapret_runner.terminate()
+            self.process_stopped.emit("Процесс завершен.")
+        except Exception as e:
+            self.error_occurred.emit(f"Ошибка при остановке процесса:\n{e}", None)
+        finally:
+            self.finished.emit()
 
 
 # --- Основной класс приложения ---
