@@ -111,11 +111,10 @@ class CommandRunnerApp(QWidget):
         scroll.setWidget(cmd_buttons_widget)
         self.main_layout.addWidget(scroll)
 
-        # --- Кнопка Остановки ---
-        self.stop_button = QPushButton("Остановить winws")
-        self.stop_button.setStyleSheet("background-color: #D00005;")
-        self.stop_button.clicked.connect(self.stop_current_command)
-        self.main_layout.addWidget(self.stop_button)
+        self.tray_icon = QSystemTrayIcon(self)
+        self.tray_icon.setIcon(QIcon("icon.ico"))
+
+        tray_menu = QMenu()
 
         restore_action = QAction("Восстановить", self)
         restore_action.triggered.connect(self.show_normal)
