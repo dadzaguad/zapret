@@ -28,7 +28,9 @@ class CommandWorker(QObject):
 
     def run_command(self) -> None:
         if not self._command_name:
-            self.error_occurred.emit("Worker: Не указано имя команды.", self._command_name)
+            self.error_occurred.emit(
+                "Worker: Не указано имя команды.", self._command_name
+            )
             self.finished.emit()
             return
         try:
@@ -57,7 +59,8 @@ class CommandRunnerApp(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QWidget {
                 background-color: #2d2d2d;
                 color: #ffffff;
@@ -73,11 +76,14 @@ class CommandRunnerApp(QWidget):
             QScrollArea {
                 border: 1px solid #3a3a3a;
             }
-        """)
+        """
+        )
         self.setWindowTitle("Zapret")
         self.setGeometry(200, 200, 500, 350)
         self.setFixedSize(self.size())
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowMaximizeButtonHint)
+        self.setWindowFlags(
+            self.windowFlags() & ~Qt.WindowType.WindowMaximizeButtonHint
+        )
         self.main_layout = QVBoxLayout(self)
         self.active_threads = set()
         self.command_buttons = {}
@@ -129,7 +135,10 @@ class CommandRunnerApp(QWidget):
     def show_normal(self) -> None:
         """Восстановление окна из трея"""
         self.show()
-        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
+        self.setWindowState(
+            self.windowState() & ~Qt.WindowState.WindowMinimized
+            | Qt.WindowState.WindowActive
+        )
         self.activateWindow()
 
     def tray_icon_clicked(self, reason) -> None:
@@ -248,7 +257,9 @@ class CommandRunnerApp(QWidget):
         if self.running_command_name:
             msg = QMessageBox(self)
             msg.setWindowTitle("Подтверждение")
-            msg.setText("Вы уверены, что хотите выйти? Некоторые процессы могут быть остановлены.")
+            msg.setText(
+                "Вы уверены, что хотите выйти? Некоторые процессы могут быть остановлены."
+            )
             msg.setIcon(QMessageBox.Icon.Question)
             msg.setStandardButtons(
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
