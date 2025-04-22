@@ -66,8 +66,27 @@ class CommandRunnerApp(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Менеджер")
-        self.setGeometry(200, 200, 400, 400)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #2d2d2d;
+                color: #ffffff;
+            }
+            QPushButton {
+                background-color: #3a3a3a;
+                border: 1px solid #4a4a4a;
+                color: white;
+            }
+            QPushButton:hover {
+                background-color: #4a4a4a;
+            }
+            QScrollArea {
+                border: 1px solid #3a3a3a;
+            }
+        """)
+        self.setWindowTitle("Zapret")
+        self.setGeometry(200, 200, 500, 350)
+        self.setFixedSize(self.size())
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowMaximizeButtonHint)
         self.main_layout = QVBoxLayout(self)
         self.active_threads = set()
         self.command_buttons = {}
