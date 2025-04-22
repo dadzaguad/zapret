@@ -1,5 +1,6 @@
+import os
+
 from PyQt6.QtWidgets import (
-    QApplication,
     QWidget,
     QVBoxLayout,
     QPushButton,
@@ -12,7 +13,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QObject, QThread, pyqtSignal, QTimer, Qt, QEvent
 from PyQt6.QtGui import QCloseEvent, QAction, QIcon
 
-from src.scripts.commands import ZapretRunner, COMMAND_ARGS
+from src.gui.resource_utils import resource_path
+from src.scripts.commands import ZapretRunner
 
 
 class CommandWorker(QObject):
@@ -97,7 +99,7 @@ class CommandRunnerApp(QWidget):
         cmd_buttons_widget.setLayout(cmd_layout)
         cmd_layout.addWidget(QLabel("Запуск профиля:"))
 
-        for command_name in COMMAND_ARGS.keys():
+        for command_name in self.zapret_runner.commands.keys():
             button = QPushButton(command_name)
             button.setStyleSheet(self.DEFAULT_STYLE)
             button.setMinimumHeight(30)
@@ -114,7 +116,12 @@ class CommandRunnerApp(QWidget):
 
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(QIcon("icon.ico"))
+        icon_path = resource_path("icon.ico")
+        if not os.path.exists(icon_path):
+            # Альтернативный путь для PyInstaller
+            icon_path = resource_path(os.path.join("src", "gui", "icon.ico"))
 
+        self.tray_icon.setIcon(QIcon(icon_path))
         tray_menu = QMenu()
 
         restore_action = QAction("Восстановить", self)
@@ -150,7 +157,10 @@ class CommandRunnerApp(QWidget):
         """Обработка изменения состояния окна (сворачивание)"""
         if event.type() == QEvent.Type.WindowStateChange:
             if self.isMinimized():
-                self.hide()
+                if QSystemTrayIcon.isSystemTrayAvailable():
+                    self.hide()
+                else:
+                    self.showMinimized()
         super().changeEvent(event)
 
     def handle_command_button(self, command_name: str) -> None:
