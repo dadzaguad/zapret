@@ -117,7 +117,19 @@ class CommandRunnerApp(QWidget):
         self.stop_button.clicked.connect(self.stop_current_command)
         self.main_layout.addWidget(self.stop_button)
 
-        # Устанавливаем начальное состояние UI
+        restore_action = QAction("Восстановить", self)
+        restore_action.triggered.connect(self.show_normal)
+        tray_menu.addAction(restore_action)
+
+        exit_action = QAction("Выход", self)
+        exit_action.triggered.connect(self.close)
+        tray_menu.addAction(exit_action)
+
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.show()
+
+        self.tray_icon.activated.connect(self.tray_icon_clicked)
+
         self._set_ui_state_can_start()
 
     # --- Методы управления состоянием UI ---
