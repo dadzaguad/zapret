@@ -2,6 +2,7 @@ name: Build and Release Application
 
 on:
   push:
+    branches: [ "feature", "main" ]
     tags:
       - "v*"
 
