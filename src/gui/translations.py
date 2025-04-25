@@ -20,7 +20,9 @@ class Translator:
             for filename in os.listdir(translations_path):
                 if filename.endswith(".json"):
                     lang = filename.split(".")[0]
-                    with open(os.path.join(translations_path, filename), "r", encoding="utf-8") as f:
+                    with open(
+                        os.path.join(translations_path, filename), "r", encoding="utf-8"
+                    ) as f:
                         self._translations[lang] = json.load(f)
         except Exception as e:
             print(f"Error loading translations: {e}")
@@ -29,19 +31,16 @@ class Translator:
     def _detect_system_language(self) -> str:
         """Определяет язык системы с помощью Windows API"""
         try:
-            # Способ 1: Через Windows API
             windll = ctypes.windll.kernel32
             lang_id = windll.GetUserDefaultUILanguage()
             primary_lang = lang_id & 0x3FF
             if primary_lang == 0x19:  # Russian
                 return "ru"
 
-            # Способ 2: Через locale (резервный)
             sys_lang = locale.getdefaultlocale()[0]
             if sys_lang and "ru" in sys_lang.lower():
                 return "ru"
 
-            # Способ 3: Через переменные окружения (если предыдущие не сработали)
             if "LANG" in os.environ and "ru" in os.environ["LANG"].lower():
                 return "ru"
 
