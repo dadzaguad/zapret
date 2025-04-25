@@ -1,0 +1,14 @@
+{
+    "process_completed": "Process completed",
+    "confirmation": "Confirmation",
+    "confirm_exit": "Are you sure you want to exit? Some processes may be stopped.",
+    "admin_error": "Admin rights error",
+    "admin_restart_error": "Failed to restart the program with administrator rights",
+    "process_stop_error": "Error while stopping the process",
+    "restore": "Restore",
+    "exit": "Exit",
+    "profile_start": "Profile start",
+    "error": "Error",
+    "yes": "Yes",
+    "no": "No"
+}
