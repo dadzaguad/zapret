@@ -1,76 +1,75 @@
-name: Build and Release Application
+name: Build and Sign Application
 
 on:
   push:
+    branches: [ "feature", "main" ]
     tags:
       - "v*"
 
 jobs:
-  build:
+  build-and-sign:
     runs-on: windows-latest
 
     steps:
-      # Проверка исходного кода
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Установка Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.x"
 
-      # Установка зависимостей
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
-          pip install pyinstaller
+        run: python -m pip install --upgrade pip setuptools wheel && pip install -r requirements.txt && pip install pyinstaller
 
-      # Сборка при помощи PyInstaller
+      - name: Generate certificate with OpenSSL
+        shell: cmd
+        run: openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "//CN=ZapretApp" && openssl pkcs12 -export -out cert.pfx -inkey key.pem -in cert.pem -password pass:Password123
+
       - name: Build with PyInstaller
-        run: pyinstaller --onefile --noconsole --paths=src --add-data "src/scripts/bin;src/scripts/bin" --add-data "src/scripts/*.txt;src/scripts" --icon=icon.ico --distpath dist main.py
+        run: pyinstaller --onefile --noconsole --paths=src --add-data "src/scripts/bin;src/scripts/bin" --add-data "src/scripts/*.txt;src/scripts" --add-data "src/scripts/commands.json;src/scripts" --add-data "icon.ico;." --icon=icon.ico main.py
 
-      # Перемещение собранного файла в отдельный каталог
-      - name: Move artifact
+      - name: Install Windows SDK
+        run: choco install windows-sdk-10.1 -y
+
+      - name: Sign executable
+        shell: powershell
         run: |
-          mkdir -p dist-artifacts
-          mv dist/main.exe dist-artifacts/main.exe
+          $signtool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
+          & "$signtool" sign /f cert.pfx /p Password123 /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v dist\main.exe
+          & "$signtool" verify /pa /v dist\main.exe | Out-Null
+          exit 0
 
-      # Проверка файлов после сборки
-      - name: Check files after build
+      - name: Prepare artifact
+        shell: cmd
         run: |
-          ls -R
-          ls dist-artifacts
+          mkdir dist-artifacts
+          move dist\main.exe dist-artifacts\
+          dir dist-artifacts
 
-      # Загрузка артефакта для передачи другому шагу
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: application-build
+          name: signed-application
           path: dist-artifacts/main.exe
 
   release:
-    needs: build
+    needs: build-and-sign
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
 
     steps:
-      # Загрузка артефакта для релиза
-      - name: Download build artifact
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: application-build
+          name: signed-application
 
-      # Проверка, что файл загружен
-      - name: Check downloaded artifact
-        run: |
-          ls -R
-
-      # Публикация релиза на GitHub
-      - name: Publish Release
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: main.exe
+          tag_name: ${{ github.ref }}
+          name: Release ${{ github.ref_name }}
+          body: "Self-signed executable (Windows may show security warning)"
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}

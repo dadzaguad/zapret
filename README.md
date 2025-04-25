@@ -1,4 +1,4 @@
-# GUI Zapret
+ # GUI Zapret
 
 Этот проект представляет инструмент для настройки и запуска DPI (Deep Packet Inspection) обхода через удобный графический интерфейс. Приложение позволяет запускать преднастроенные команды `winws.exe` для управления сетевыми соединениями и тестирования обхода DPI.
 
@@ -31,7 +31,7 @@
 Убедитесь, что установлен Python 3.13 или выше и необходимые зависимости:
    pip install -r requirements.txt
 Соберите проект:
-   pyinstaller --onefile --noconsole --paths=src --add-data "src/scripts/bin;src/scripts/bin" --add-data "src/scripts/*.txt;src/scripts" --icon=icon.ico main.py
+   pyinstaller --onefile --noconsole --paths=src --add-data "src/scripts/bin;src/scripts/bin" --add-data "src/scripts/*.txt;src/scripts" --add-data "src/scripts/commands.json;src/scripts" --add-data "icon.ico;." --icon=icon.ico main.py
 Готовый .exe файл появится в папке dist.
 ✨ Функционал
 Обход DPI:
