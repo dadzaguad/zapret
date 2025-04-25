@@ -32,7 +32,7 @@ jobs:
       # Сборка при помощи PyInstaller (используем spec-файл)
       - name: Build with PyInstaller
         run: |
-          pyinstaller --clean --noconfirm main.spec
+          pyinstaller main.spec
           # Проверяем, что файл создан
           if not exist "dist\main.exe" (exit 1)
 
