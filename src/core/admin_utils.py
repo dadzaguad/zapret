@@ -2,6 +2,7 @@ import ctypes
 import os
 import sys
 from PyQt6.QtWidgets import QMessageBox
+from src.gui.translations import translator
 
 
 def is_admin():
@@ -23,7 +24,7 @@ def restart_as_admin():
     except Exception as e:
         QMessageBox.critical(
             None,
-            "Ошибка прав администратора",
-            f"Не удалось перезапустить программу с правами администратора:\n{e}",
+            translator.translate("admin_error", "Admin rights error"),
+            f"{translator.translate('admin_restart_error', 'Failed to restart with admin rights')}:\n{e}",
         )
     sys.exit(1)

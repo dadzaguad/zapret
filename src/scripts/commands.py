@@ -2,6 +2,7 @@ import json
 import shlex
 import subprocess
 import os
+from src.gui.translations import translator
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -13,7 +14,7 @@ class ZapretRunner:
         self._current_process = None
         self.commands = self._load_commands()
 
-    def _load_commands(self) -> dict:
+    def _load_commands(self) -> dict[str:str]:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         commands_path = os.path.join(script_dir, "commands.json")
 
@@ -50,12 +51,17 @@ class ZapretRunner:
         )
 
     def terminate(self) -> None:
-
         if self._current_process is None:
-            raise RuntimeError("Process is not launched")
+            raise RuntimeError(
+                translator.translate("process_not_launched", "Process is not launched")
+            )
 
         try:
             self._current_process.terminate()
             self._current_process = None
         except Exception:
-            raise RuntimeError("Unexpected error while stopping zapret")
+            raise RuntimeError(
+                translator.translate(
+                    "process_stop_error", "Error while stopping process"
+                )
+            )
