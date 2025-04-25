@@ -2,10 +2,8 @@ name: Build and Release Application
 
 on:
   push:
-    branches: [ "feature", "main" ]
     tags:
-      - "v*"  # И при создании тега v*
-  workflow_dispatch:
+      - "v*"
 
 jobs:
   build:
@@ -20,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"  # Явно указываем версию Python
+          python-version: "3.x"
 
       # Установка зависимостей
       - name: Install dependencies
@@ -29,35 +27,28 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # Сборка при помощи PyInstaller (используем spec-файл)
+      # Сборка при помощи PyInstaller
       - name: Build with PyInstaller
-        run: |
-          pyinstaller main.spec
-          # Проверяем, что файл создан
-          if not exist "dist\main.exe" (exit 1)
+        run: pyinstaller --onefile --noconsole --paths=src --add-data "src/scripts/bin;src/scripts/bin" --add-data "src/scripts/*.txt;src/scripts" --add-data "src/scripts/commands.json;src/scripts" --add-data "icon.ico;." --icon=icon.ico main.py
 
-      # Создаем папку для артефактов и копируем туда exe
-      - name: Prepare artifact
+      # Перемещение собранного файла в отдельный каталог
+      - name: Move artifact
         run: |
           mkdir -p dist-artifacts
-          copy dist\main.exe dist-artifacts\
-          # Копируем необходимые дополнительные файлы, если нужно
-          xcopy src\scripts\*.txt dist-artifacts\ /Y
-          xcopy src\scripts\*.json dist-artifacts\ /Y
-          xcopy src\scripts\bin dist-artifacts\bin\ /E /Y
+          mv dist/main.exe dist-artifacts/main.exe
 
       # Проверка файлов после сборки
       - name: Check files after build
         run: |
-          dir /s dist-artifacts
+          ls -R
+          ls dist-artifacts
 
-      # Загрузка артефакта
+      # Загрузка артефакта для передачи другому шагу
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: application-build
-          path: dist-artifacts/*
-          retention-days: 5
+          path: dist-artifacts/main.exe
 
   release:
     needs: build
@@ -65,28 +56,21 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
 
     steps:
-      # Загрузка артефакта
+      # Загрузка артефакта для релиза
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
           name: application-build
-          path: release-files
 
-      # Создание релиза
-      - name: Create Release
+      # Проверка, что файл загружен
+      - name: Check downloaded artifact
+        run: |
+          ls -R
+
+      # Публикация релиза на GitHub
+      - name: Publish Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            release-files/main.exe
-            release-files/*.txt
-            release-files/*.json
-            release-files/bin/*
-          tag_name: ${{ github.ref }}
-          name: Release ${{ github.ref_name }}
-          body: |
-            Автоматически собранная версия ${{ github.ref_name }}
-            Содержит:
-            - main.exe
-            - Конфигурационные файлы
+          files: main.exe
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
