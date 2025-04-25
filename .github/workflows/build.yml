@@ -34,10 +34,18 @@ jobs:
 
       - name: Sign executable
         shell: powershell
-        run: $signtool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"; & "$signtool" sign /f cert.pfx /p Password123 /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v dist\main.exe; & "$signtool" verify /pa /v dist\main.exe | Out-Null; exit 0
+        run: |
+          $signtool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
+          & "$signtool" sign /f cert.pfx /p Password123 /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v dist\main.exe
+          & "$signtool" verify /pa /v dist\main.exe | Out-Null
+          exit 0
 
       - name: Prepare artifact
-        run: mkdir -p dist-artifacts && mv dist/main.exe dist-artifacts/ && dir /s dist-artifacts
+        shell: cmd
+        run: |
+          mkdir dist-artifacts
+          move dist\main.exe dist-artifacts\
+          dir dist-artifacts
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
