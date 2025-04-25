@@ -2,7 +2,7 @@ name: Build and Sign Application
 
 on:
   push:
-    branches: [ "feature", "main" ]
+    branches: [ "feature", "master" ]
     tags:
       - "v*"
 
@@ -44,14 +44,14 @@ jobs:
         shell: cmd
         run: |
           mkdir dist-artifacts
-          move dist\main.exe dist-artifacts\
+          move dist\main.exe dist-artifacts\Zapret.exe
           dir dist-artifacts
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: signed-application
-          path: dist-artifacts/main.exe
+          path: dist-artifacts/Zapret.exe
 
   release:
     needs: build-and-sign
@@ -63,11 +63,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: signed-application
+          path: release-artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: main.exe
+          files: release-artifacts/Zapret.exe
           tag_name: ${{ github.ref }}
           name: Release ${{ github.ref_name }}
           body: "Self-signed executable (Windows may show security warning)"
