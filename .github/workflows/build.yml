@@ -35,16 +35,39 @@ jobs:
       - name: Sign executable
         shell: powershell
         run: |
-          $signtool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
-          & "$signtool" sign /f cert.pfx /p Password123 /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v dist\main.exe
-          & "$signtool" verify /pa /v dist\main.exe | Out-Null
-          exit 0
+          # Путь к signtool может меняться, используй переменную окружения или более надежный способ поиска
+          $signtoolPaths = @(
+              "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe",
+              "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22000.0\x64\signtool.exe",
+              "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe"
+              # Добавь другие возможные пути при необходимости
+          )
+          $signtool = $signtoolPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $signtool) {
+              Write-Error "SignTool.exe not found in expected locations."
+              exit 1
+          }
+          Write-Host "Using SignTool: $signtool"
+
+          # --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+          $targetExe = "dist\Zapret.exe" # Используем правильное имя файла
+          # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+          Write-Host "Signing $targetExe..."
+          & "$signtool" sign /f cert.pfx /p Password123 /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v "$targetExe"
+          Write-Host "Verifying signature for $targetExe..."
+          & "$signtool" verify /pa /v "$targetExe" # Убрал Out-Null для отладки, можно вернуть если мешает
+          # Убрал exit 0, чтобы workflow упал, если signtool вернет ошибку
 
       - name: Prepare artifact
         shell: cmd
         run: |
           mkdir dist-artifacts
-          move dist\main.exe dist-artifacts\Zapret.exe
+          echo Moving dist\Zapret.exe to dist-artifacts\Zapret.exe
+          # --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+          move dist\Zapret.exe dist-artifacts\Zapret.exe
+          # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+          echo Contents of dist-artifacts:
           dir dist-artifacts
 
       - name: Upload build artifact
@@ -69,8 +92,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: release-artifacts/Zapret.exe
-          tag_name: ${{ github.ref }}
-          name: Release ${{ github.ref_name }}
+
           body: "Self-signed executable (Windows may show security warning)"
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
