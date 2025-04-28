@@ -53,6 +53,7 @@ class CommandWorker(QObject):
         finally:
             self.finished.emit()
 
+
 class CommandRunnerApp(QWidget):
     RUNNING_STYLE: str = "background-color: lightgreen; color: black;"
     DEFAULT_STYLE: str = ""
