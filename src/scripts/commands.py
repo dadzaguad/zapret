@@ -10,9 +10,18 @@ BIN_PATH = os.path.join(SCRIPT_DIR, "bin")
 
 
 class ZapretRunner:
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            instance = super().__new__(cls)
+            instance._current_process = None
+            instance.commands = instance._get_commands()
+            cls._instance = instance
+        return cls._instance
+
     def __init__(self):
-        self._current_process = None
-        self.commands = self._load_commands()
+        pass
 
     def _get_commands(self) -> dict[str, str]:
         script_dir = os.path.dirname(os.path.abspath(__file__))

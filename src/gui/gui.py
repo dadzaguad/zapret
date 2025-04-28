@@ -20,30 +20,38 @@ from src.gui.translations import translator
 
 
 class CommandWorker(QObject):
-    command_started: pyqtSignal = pyqtSignal(str)  # type: ignore
-    process_stopped: pyqtSignal = pyqtSignal(str)  # type: ignore
-    error_occurred: pyqtSignal = pyqtSignal(str, str)  # type: ignore
-    finished: pyqtSignal = pyqtSignal()  # type: ignore
+    command_started: pyqtSignal = pyqtSignal(str)
+    process_stopped: pyqtSignal = pyqtSignal(str)
+    error_occurred: pyqtSignal = pyqtSignal(str, str)
+    finished: pyqtSignal = pyqtSignal()
 
-    def __init__(self, zapret_runner: ZapretRunner, command_name: Optional[str] = None):
+    def __init__(self, zapret_runner: ZapretRunner, command_name: [str] = None):
         super().__init__()
         self._zapret_runner: ZapretRunner = zapret_runner
-        self._command_name: Optional[str] = command_name
+        self._command_name: [str] = command_name
 
     def run_command(self) -> None:
         if self._command_name is None:
+            self.finished.emit()
             return
-        self._zapret_runner.run(self._command_name)
-        self.command_started.emit(self._command_name)
-        self.finished.emit()
+        try:
+            self._zapret_runner.run(self._command_name)
+            self.command_started.emit(self._command_name)
+        except (ValueError, RuntimeError) as e:
+            self.error_occurred.emit(str(e), self._command_name)
+        finally:
+            self.finished.emit()
 
     def stop_command(self) -> None:
-        self._zapret_runner.terminate()
-        self.process_stopped.emit(
-            translator.translate("process_completed", "Process completed")
-        )
-        self.finished.emit()
-
+        try:
+            self._zapret_runner.terminate()
+            self.process_stopped.emit(
+                translator.translate("process_completed", "Process completed")
+            )
+        except RuntimeError as e:
+            self.error_occurred.emit(str(e), None)
+        finally:
+            self.finished.emit()
 
 class CommandRunnerApp(QWidget):
     RUNNING_STYLE: str = "background-color: lightgreen; color: black;"
@@ -215,7 +223,7 @@ class CommandRunnerApp(QWidget):
         )
         worker.moveToThread(thread)
         self._active_threads.add(thread)
-        thread.worker = worker  # type: ignore
+        thread.worker = worker
 
         thread.started.connect(worker.run_command)
         worker.command_started.connect(self._on_command_started)
@@ -236,7 +244,7 @@ class CommandRunnerApp(QWidget):
         worker: CommandWorker = CommandWorker(self.zapret_runner)
         worker.moveToThread(thread)
         self._active_threads.add(thread)
-        thread.worker = worker  # type: ignore
+        thread.worker = worker
 
         thread.started.connect(worker.stop_command)
         worker.process_stopped.connect(self._on_process_stopped)
@@ -284,8 +292,8 @@ class CommandRunnerApp(QWidget):
             )
             msg.setDefaultButton(QMessageBox.StandardButton.No)
 
-            yes_btn: QPushButton = msg.button(QMessageBox.StandardButton.Yes)
-            no_btn: QPushButton = msg.button(QMessageBox.StandardButton.No)
+            yes_btn: Optional[QPushButton] = msg.button(QMessageBox.StandardButton.Yes)
+            no_btn: Optional[QPushButton] = msg.button(QMessageBox.StandardButton.No)
             yes_btn.setText(yes_text)
             no_btn.setText(no_text)
             yes_btn.setMinimumWidth(50)
