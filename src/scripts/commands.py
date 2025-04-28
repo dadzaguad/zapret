@@ -2,6 +2,8 @@ import json
 import shlex
 import subprocess
 import os
+from typing import Optional
+
 from src.gui.translations import translator
 
 
@@ -11,19 +13,21 @@ BIN_PATH = os.path.join(SCRIPT_DIR, "bin")
 
 class ZapretRunner:
     _instance = None
+    _current_process: Optional[subprocess.Popen] = None
+    commands: dict[str, str]
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             instance = super().__new__(cls)
             instance._current_process = None
-            instance.commands = instance._get_commands()
+            instance.commands = instance._load_commands()
             cls._instance = instance
         return cls._instance
 
     def __init__(self):
         pass
 
-    def _get_commands(self) -> dict[str, str]:
+    def _load_commands(self) -> dict[str, str]:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         commands_path = os.path.join(script_dir, "commands.json")
 

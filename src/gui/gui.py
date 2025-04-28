@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSystemTrayIcon,
     QMenu,
+    QAbstractButton,
 )
 from PyQt6.QtCore import QObject, QThread, pyqtSignal, QTimer, Qt, QEvent
 from PyQt6.QtGui import QCloseEvent, QAction, QIcon
@@ -25,10 +26,10 @@ class CommandWorker(QObject):
     error_occurred: pyqtSignal = pyqtSignal(str, str)
     finished: pyqtSignal = pyqtSignal()
 
-    def __init__(self, zapret_runner: ZapretRunner, command_name: [str] = None):
+    def __init__(self, zapret_runner: ZapretRunner, command_name: Optional[str] = None):
         super().__init__()
         self._zapret_runner: ZapretRunner = zapret_runner
-        self._command_name: [str] = command_name
+        self._command_name: Optional[str] = command_name
 
     def run_command(self) -> None:
         if self._command_name is None:
@@ -58,7 +59,7 @@ class CommandRunnerApp(QWidget):
     RUNNING_STYLE: str = "background-color: lightgreen; color: black;"
     DEFAULT_STYLE: str = ""
 
-    def __init__(self):
+    def __init__(self, zapret_runner: ZapretRunner):
         super().__init__()
 
         icon_path: str = resource_path("icon.ico")
@@ -102,7 +103,7 @@ class CommandRunnerApp(QWidget):
         self._command_buttons: Dict[str, QPushButton] = {}
         self._running_command_name: Optional[str] = None
         self._pending_command: Optional[str] = None
-        self.zapret_runner: ZapretRunner = ZapretRunner()
+        self.zapret_runner: ZapretRunner = zapret_runner
 
         cmd_buttons_widget: QWidget = QWidget()
         cmd_layout: QVBoxLayout = QVBoxLayout()
@@ -111,15 +112,21 @@ class CommandRunnerApp(QWidget):
             QLabel(translator.translate("profile_start", "Profile start"))
         )
 
-        for command_name in self.zapret_runner.commands.keys():
-            button: QPushButton = QPushButton(command_name)
-            button.setStyleSheet(self.DEFAULT_STYLE)
-            button.setMinimumHeight(30)
-            button.clicked.connect(
-                lambda checked, name=command_name: self.handle_command_button(name)
+        if hasattr(self.zapret_runner, "commands") and self.zapret_runner.commands:
+            for command_name in self.zapret_runner.commands.keys():
+                button: QPushButton = QPushButton(command_name)
+                button.setStyleSheet(self.DEFAULT_STYLE)
+                button.setMinimumHeight(30)
+                button.clicked.connect(
+                    lambda checked, name=command_name: self.handle_command_button(name)
+                )
+                cmd_layout.addWidget(button)
+                self._command_buttons[command_name] = button
+        else:
+            no_commands_label = QLabel(
+                translator.translate("no_commands_loaded", "No commands found.")
             )
-            cmd_layout.addWidget(button)
-            self._command_buttons[command_name] = button
+            cmd_layout.addWidget(no_commands_label)
 
         scroll: QScrollArea = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -144,7 +151,6 @@ class CommandRunnerApp(QWidget):
         self._set_ui_state_can_start()
 
     def show_normal(self) -> None:
-        """Восстановление окна из трея"""
         self.show()
         self.setWindowState(
             self.windowState() & ~Qt.WindowState.WindowMinimized
@@ -153,18 +159,14 @@ class CommandRunnerApp(QWidget):
         self.activateWindow()
 
     def tray_icon_clicked(self, reason: QSystemTrayIcon.ActivationReason) -> None:
-        """Обработка кликов по иконке в трее"""
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.show_normal()
 
-    def changeEvent(self, event: QEvent) -> None:
-        """Обработка изменения состояния окна (сворачивание)"""
-        if event.type() == QEvent.Type.WindowStateChange:
+    def changeEvent(self, event: Optional[QEvent]) -> None:
+        if event is not None and event.type() == QEvent.Type.WindowStateChange:
             if self.isMinimized():
                 if QSystemTrayIcon.isSystemTrayAvailable():
                     self.hide()
-                else:
-                    self.showMinimized()
         super().changeEvent(event)
 
     def handle_command_button(self, command_name: str) -> None:
@@ -184,9 +186,7 @@ class CommandRunnerApp(QWidget):
             )
             if button:
                 button.setStyleSheet(self.DEFAULT_STYLE)
-
         self._running_command_name = None
-
         if self._pending_command:
             command_to_run: str = self._pending_command
             self._pending_command = None
@@ -196,19 +196,16 @@ class CommandRunnerApp(QWidget):
                 button.setEnabled(True)
 
     def _set_ui_state_can_stop(self, command_name: str) -> None:
-        if self._running_command_name:
+        if self._running_command_name and self._running_command_name != command_name:
             old_button: Optional[QPushButton] = self._command_buttons.get(
                 self._running_command_name
             )
             if old_button:
                 old_button.setStyleSheet(self.DEFAULT_STYLE)
-
         self._running_command_name = command_name
-
         button: Optional[QPushButton] = self._command_buttons.get(command_name)
         if button:
             button.setStyleSheet(self.RUNNING_STYLE)
-
         for btn in self._command_buttons.values():
             btn.setEnabled(True)
 
@@ -225,7 +222,6 @@ class CommandRunnerApp(QWidget):
         worker.moveToThread(thread)
         self._active_threads.add(thread)
         thread.worker = worker
-
         thread.started.connect(worker.run_command)
         worker.command_started.connect(self._on_command_started)
         worker.error_occurred.connect(self._on_task_error)
@@ -233,20 +229,18 @@ class CommandRunnerApp(QWidget):
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(lambda t=thread: self._active_threads.discard(t))
         thread.finished.connect(thread.deleteLater)
-
         thread.start()
 
     def _stop_current_command(self) -> None:
         if self._running_command_name is None:
+            self._set_ui_state_can_start()
             return
-
         self._set_ui_state_busy()
         thread: QThread = QThread()
         worker: CommandWorker = CommandWorker(self.zapret_runner)
         worker.moveToThread(thread)
         self._active_threads.add(thread)
         thread.worker = worker
-
         thread.started.connect(worker.stop_command)
         worker.process_stopped.connect(self._on_process_stopped)
         worker.error_occurred.connect(self._on_task_error)
@@ -254,7 +248,6 @@ class CommandRunnerApp(QWidget):
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(lambda t=thread: self._active_threads.discard(t))
         thread.finished.connect(thread.deleteLater)
-
         thread.start()
 
     def _on_command_started(self, started_command_name: str) -> None:
@@ -273,53 +266,58 @@ class CommandRunnerApp(QWidget):
             else:
                 self._set_ui_state_can_start()
 
-    def closeEvent(self, event: QCloseEvent) -> None:
+    def closeEvent(self, event: Optional[QCloseEvent]) -> None:
         if self._running_command_name:
             msg: QMessageBox = QMessageBox(self)
             msg.setWindowTitle(translator.translate("confirmation", "Confirmation"))
             msg.setText(
                 translator.translate(
-                    "confirm_exit",
-                    "Are you sure you want to exit? Some processes may be stopped.",
+                    "confirm_exit_running",
+                    "A process is running. Are you sure you want to exit? The process will be stopped.",
                 )
             )
             msg.setIcon(QMessageBox.Icon.Question)
-
-            # Переводим кнопки
-            yes_text = translator.translate("yes", "Yes")
-            no_text = translator.translate("no", "No")
+            yes_text: str = translator.translate("yes", "Yes")
+            no_text: str = translator.translate("no", "No")
             msg.setStandardButtons(
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             msg.setDefaultButton(QMessageBox.StandardButton.No)
-
-            yes_btn: Optional[QPushButton] = msg.button(QMessageBox.StandardButton.Yes)
-            no_btn: Optional[QPushButton] = msg.button(QMessageBox.StandardButton.No)
-            yes_btn.setText(yes_text)
-            no_btn.setText(no_text)
-            yes_btn.setMinimumWidth(50)
-            no_btn.setMinimumWidth(50)
-            yes_btn.setMinimumHeight(20)
-            no_btn.setMinimumHeight(20)
-
-            result: QMessageBox.StandardButton = msg.exec()
+            yes_btn: Optional[QAbstractButton] = msg.button(
+                QMessageBox.StandardButton.Yes
+            )
+            no_btn: Optional[QAbstractButton] = msg.button(
+                QMessageBox.StandardButton.No
+            )
+            if yes_btn:
+                yes_btn.setText(yes_text)
+                yes_btn.setMinimumWidth(60)
+                yes_btn.setMinimumHeight(25)
+            if no_btn:
+                no_btn.setText(no_text)
+                no_btn.setMinimumWidth(60)
+                no_btn.setMinimumHeight(25)
+            result: int = msg.exec()
             if result == QMessageBox.StandardButton.No:
-                event.ignore()
+                if event:
+                    event.ignore()
                 return
-
-        if self._running_command_name:
-            try:
-                self.zapret_runner.terminate()
-            except Exception as e:
-                QMessageBox.critical(
-                    self,
-                    translator.translate("error", "Error"),
-                    f"{translator.translate('process_stop_error', 'Error while stopping process')}: {str(e)}",
-                )
+            else:
+                try:
+                    if self._running_command_name:
+                        self.zapret_runner.terminate()
+                except Exception as e:
+                    QMessageBox.critical(
+                        self,
+                        translator.translate("error", "Error"),
+                        f"{translator.translate('process_stop_error', 'Error while stopping process')}: {str(e)}",
+                    )
 
         for thread in list(self._active_threads):
-            thread.quit()
-            thread.wait()
-
+            if thread.isRunning():
+                thread.quit()
+                if not thread.wait(500):
+                    print(f"Warning: Thread {thread} did not finish gracefully.")
         self.tray_icon.hide()
-        event.accept()
+        if event:
+            event.accept()
