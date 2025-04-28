@@ -14,7 +14,7 @@ class ZapretRunner:
         self._current_process = None
         self.commands = self._load_commands()
 
-    def _load_commands(self) -> dict[str:str]:
+    def _get_commands(self) -> dict[str, str]:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         commands_path = os.path.join(script_dir, "commands.json")
 
