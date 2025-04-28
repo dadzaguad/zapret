@@ -29,24 +29,57 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller main.spec
 
-      - name: Install Windows SDK
-        run: choco install windows-sdk-10.1 -y
-
       - name: Sign executable
         shell: powershell
         run: |
-          # ... (код поиска signtool) ...
+          # Ищем signtool.exe рекурсивно в стандартном месте установки SDK
+          $sdkBinPath = "C:\Program Files (x86)\Windows Kits\10\bin"
+          Write-Host "Searching for signtool.exe in $sdkBinPath..."
+          $signtool = Get-ChildItem -Path $sdkBinPath -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "\\x64\\signtool.exe$" } | Select-Object -ExpandProperty FullName -First 1
+
           if (-not $signtool) {
-              Write-Error "SignTool.exe not found in expected locations."
+              # Дополнительная попытка поиска без учета x64 на случай странных установок
+              Write-Host "Signtool.exe (x64) not found, trying any architecture..."
+              $signtool = Get-ChildItem -Path $sdkBinPath -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
+          }
+
+          if (-not $signtool) {
+              Write-Error "SignTool.exe not found in $sdkBinPath or subdirectories."
+              # Дополнительная диагностика: выведем содержимое папки bin
+              if (Test-Path $sdkBinPath) {
+                 Write-Host "Contents of $sdkBinPath\ :"
+                 Get-ChildItem -Path $sdkBinPath -Depth 1 | Out-String | Write-Host
+              } else {
+                 Write-Host "$sdkBinPath does not exist."
+              }
               exit 1
           }
-          Write-Host "Using SignTool: $signtool"
-          
+          Write-Host "Found SignTool: $signtool"
+
           $targetExe = "dist\Zapret.exe"
-          
+
           Write-Host "Signing $targetExe with self-signed certificate..."
-          & "$signtool" sign /f cert.pfx /p Password123 /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v "$targetExe"
-          Write-Host "Signing process completed (verification skipped for self-signed)."
+          # Используем Start-Process для лучшей обработки ошибок и кавычек
+          $signArgs = @(
+              "sign",
+              "/f", "cert.pfx",
+              "/p", "Password123",
+              "/fd", "SHA256",
+              "/tr", "http://timestamp.digicert.com",
+              "/td", "SHA256",
+              "/v",
+              "`"$targetExe`"" # Экранируем кавычки для пути к exe
+          )
+          Write-Host "Executing: $signtool $signArgs"
+          $process = Start-Process -FilePath $signtool -ArgumentList $signArgs -Wait -PassThru -NoNewWindow
+          Write-Host "SignTool exit code: $($process.ExitCode)"
+
+          if ($process.ExitCode -ne 0) {
+              Write-Error "SignTool failed with exit code $($process.ExitCode)."
+              exit 1
+          }
+
+          Write-Host "Signing process completed successfully."
 
       - name: Prepare artifact
         shell: cmd
