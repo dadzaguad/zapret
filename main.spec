@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=['src'],
     binaries=[],
-    datas=[('src/scripts/bin', 'src/scripts/bin'), ('src/scripts/*.txt', 'src/scripts'), ('src/scripts/commands.json', 'src/scripts'), ('icon.ico', '.')],
+    datas=[('src/gui/translations', 'src/gui/translations'), ('src/scripts/bin', 'src/scripts/bin'), ('src/scripts/*.txt', 'src/scripts'), ('src/scripts/commands.json', 'src/scripts'), ('icon.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
