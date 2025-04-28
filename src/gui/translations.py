@@ -5,6 +5,7 @@ import ctypes
 from typing import Dict, Any
 from src.gui.resource_utils import resource_path
 
+
 class Translator:
     def __init__(self):
         self._translations: Dict[str, Dict[str, str]] = {}
@@ -17,7 +18,9 @@ class Translator:
             translations_dir_path = resource_path("src/gui/translations")
 
             if not os.path.isdir(translations_dir_path):
-                print(f"Error: Translations directory not found at resolved path: {translations_dir_path}")
+                print(
+                    f"Error: Translations directory not found at resolved path: {translations_dir_path}"
+                )
                 self._translations = {}
                 return
 
@@ -43,7 +46,6 @@ class Translator:
         else:
             print(f"Loaded languages: {list(self._translations.keys())}")
 
-
     def _detect_system_language(self) -> str:
         """Определяет язык системы с помощью Windows API"""
         detected_lang = "en"
@@ -51,7 +53,9 @@ class Translator:
             windll = ctypes.windll.kernel32
             lang_id = windll.GetUserDefaultUILanguage()
             primary_lang = lang_id & 0x3FF
-            print(f"Detected system UI language ID: {lang_id} (Primary: {primary_lang})")
+            print(
+                f"Detected system UI language ID: {lang_id} (Primary: {primary_lang})"
+            )
             if primary_lang == 0x19:
                 detected_lang = "ru"
             else:

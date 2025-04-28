@@ -297,12 +297,13 @@ class CommandRunnerApp(QWidget):
                     f"{translator.translate('process_stop_error', 'Ошибка при остановке процесса при выходе')}: {str(e)}",
                 )
 
-
         for thread in list(self._active_threads):
             if thread.isRunning():
                 thread.quit()
                 if not thread.wait(500):
-                    print(f"Warning: Thread {thread} did not finish gracefully on forced quit.")
+                    print(
+                        f"Warning: Thread {thread} did not finish gracefully on forced quit."
+                    )
 
         self.tray_icon.hide()
         QApplication.instance().quit()
