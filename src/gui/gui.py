@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import Optional, Dict, Set, Any
 
 from PyQt6.QtWidgets import (
@@ -10,7 +11,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSystemTrayIcon,
     QMenu,
-    QAbstractButton,
+    QApplication,
 )
 from PyQt6.QtCore import QObject, QThread, pyqtSignal, QTimer, Qt, QEvent
 from PyQt6.QtGui import QCloseEvent, QAction, QIcon
@@ -99,8 +100,8 @@ class CommandRunnerApp(QWidget):
         )
 
         self.main_layout: QVBoxLayout = QVBoxLayout(self)
-        self._active_threads: Set[QThread] = set()
-        self._command_buttons: Dict[str, QPushButton] = {}
+        self._active_threads: set[QThread] = set()
+        self._command_buttons: dict[str, QPushButton] = {}
         self._running_command_name: Optional[str] = None
         self._pending_command: Optional[str] = None
         self.zapret_runner: ZapretRunner = zapret_runner
@@ -141,7 +142,7 @@ class CommandRunnerApp(QWidget):
         tray_menu.addAction(restore_action)
 
         exit_action: QAction = QAction(translator.translate("exit", "Exit"), self)
-        exit_action.triggered.connect(self.close)
+        exit_action.triggered.connect(self.quit_application)
         tray_menu.addAction(exit_action)
 
         self.tray_icon.setContextMenu(tray_menu)
@@ -163,10 +164,6 @@ class CommandRunnerApp(QWidget):
             self.show_normal()
 
     def changeEvent(self, event: Optional[QEvent]) -> None:
-        if event is not None and event.type() == QEvent.Type.WindowStateChange:
-            if self.isMinimized():
-                if QSystemTrayIcon.isSystemTrayAvailable():
-                    self.hide()
         super().changeEvent(event)
 
     def handle_command_button(self, command_name: str) -> None:
@@ -267,57 +264,45 @@ class CommandRunnerApp(QWidget):
                 self._set_ui_state_can_start()
 
     def closeEvent(self, event: Optional[QCloseEvent]) -> None:
-        if self._running_command_name:
-            msg: QMessageBox = QMessageBox(self)
-            msg.setWindowTitle(translator.translate("confirmation", "Confirmation"))
-            msg.setText(
-                translator.translate(
-                    "confirm_exit_running",
-                    "A process is running. Are you sure you want to exit? The process will be stopped.",
-                )
-            )
-            msg.setIcon(QMessageBox.Icon.Question)
-            yes_text: str = translator.translate("yes", "Yes")
-            no_text: str = translator.translate("no", "No")
-            msg.setStandardButtons(
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            msg.setDefaultButton(QMessageBox.StandardButton.No)
-            yes_btn: Optional[QAbstractButton] = msg.button(
-                QMessageBox.StandardButton.Yes
-            )
-            no_btn: Optional[QAbstractButton] = msg.button(
-                QMessageBox.StandardButton.No
-            )
-            if yes_btn:
-                yes_btn.setText(yes_text)
-                yes_btn.setMinimumWidth(60)
-                yes_btn.setMinimumHeight(25)
-            if no_btn:
-                no_btn.setText(no_text)
-                no_btn.setMinimumWidth(60)
-                no_btn.setMinimumHeight(25)
-            result: int = msg.exec()
-            if result == QMessageBox.StandardButton.No:
-                if event:
-                    event.ignore()
-                return
-            else:
-                try:
-                    if self._running_command_name:
-                        self.zapret_runner.terminate()
-                except Exception as e:
-                    QMessageBox.critical(
-                        self,
-                        translator.translate("error", "Error"),
-                        f"{translator.translate('process_stop_error', 'Error while stopping process')}: {str(e)}",
-                    )
+        """Обрабатывает нажатие на крестик окна."""
+        if not event:
+            return
 
+        if self._running_command_name:
+            self.hide()
+
+            event.ignore()
+
+    def cleanup_and_accept_close(self, event: Optional[QCloseEvent]):
+        """Выполняет очистку и принимает событие закрытия."""
         for thread in list(self._active_threads):
             if thread.isRunning():
                 thread.quit()
                 if not thread.wait(500):
                     print(f"Warning: Thread {thread} did not finish gracefully.")
+
         self.tray_icon.hide()
         if event:
             event.accept()
+
+    def quit_application(self) -> None:
+        """Принудительно завершает приложение (вызывается из трей-меню)."""
+        if self._running_command_name:
+            try:
+                self.zapret_runner.terminate()
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    translator.translate("error", "Ошибка"),
+                    f"{translator.translate('process_stop_error', 'Ошибка при остановке процесса при выходе')}: {str(e)}",
+                )
+
+
+        for thread in list(self._active_threads):
+            if thread.isRunning():
+                thread.quit()
+                if not thread.wait(500):
+                    print(f"Warning: Thread {thread} did not finish gracefully on forced quit.")
+
+        self.tray_icon.hide()
+        QApplication.instance().quit()
