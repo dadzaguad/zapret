@@ -27,7 +27,7 @@ jobs:
         run: openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "//CN=ZapretApp" && openssl pkcs12 -export -out cert.pfx -inkey key.pem -in cert.pem -password pass:Password123
 
       - name: Build with PyInstaller
-        run: pyinstaller --onefile --noconsole --paths=src --add-data "src/scripts/bin;src/scripts/bin" --add-data "src/scripts/*.txt;src/scripts" --add-data "src/scripts/commands.json;src/scripts" --add-data "icon.ico;." --icon=icon.ico main.py
+        run: pyinstaller main.spec
 
       - name: Install Windows SDK
         run: choco install windows-sdk-10.1 -y
