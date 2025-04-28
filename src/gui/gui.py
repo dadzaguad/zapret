@@ -1,6 +1,5 @@
 import os
-import sys
-from typing import Optional, Dict, Set, Any
+from typing import Optional
 
 from PyQt6.QtWidgets import (
     QWidget,
