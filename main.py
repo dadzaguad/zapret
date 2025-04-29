@@ -4,7 +4,6 @@ import os
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from src.core.admin_utils import is_admin, restart_as_admin, show_critical_error
 from src.gui.gui import CommandRunnerApp
-from src.scripts.commands import ZapretRunner
 from src.gui.translations import translator
 
 APP_GUID = "{2470b8b0-e497-41e4-a51d-d2dd745535ac}"
@@ -38,7 +37,7 @@ if __name__ == "__main__":
                 sys.exit(0)
 
         elif last_error == 0 and _instance_mutex_handle:
-            is_first_instance = True
+             is_first_instance = True
 
         else:
             raise ctypes.WinError(last_error)
@@ -48,7 +47,7 @@ if __name__ == "__main__":
         show_critical_error("mutex_error_title", "Startup Error", error_msg, translator)
         if _instance_mutex_handle:
             kernel32.CloseHandle(_instance_mutex_handle)
-        sys.exit(1)
+        sys.exit(1) # Keep exit here, ignore potential PyCharm warning if it occurs
 
     exit_code = 1
     try:
@@ -58,33 +57,28 @@ if __name__ == "__main__":
 
         app = QApplication(sys.argv)
         try:
-            zapret_runner_instance = ZapretRunner()
-            window = CommandRunnerApp(zapret_runner=zapret_runner_instance)
+            window = CommandRunnerApp()
             window.show()
             exit_code = app.exec()
 
         except RuntimeError as e:
-            QMessageBox.critical(
-                None,
-                translator.translate(
-                    "initialization_error_title", "Initialization Error"
-                ),
-                f"{translator.translate('initialization_error_message', 'Failed to initialize/run the application:')}\n{e}",
-            )
-            exit_code = 1
+             QMessageBox.critical(
+                 None,
+                 translator.translate("initialization_error_title", "Initialization Error"),
+                 f"{translator.translate('initialization_error_message', 'Failed to initialize/run the application:')}\n{e}",
+             )
+             exit_code = 1
         except Exception as e:
-            QMessageBox.critical(
-                None,
-                translator.translate("critical_error_title", "Critical Error"),
-                f"{translator.translate('unexpected_error_message', 'An unexpected error occurred:')}\n{e}",
-            )
-            exit_code = 1
+             QMessageBox.critical(
+                 None,
+                 translator.translate("critical_error_title", "Critical Error"),
+                 f"{translator.translate('unexpected_error_message', 'An unexpected error occurred:')}\n{e}",
+             )
+             exit_code = 1
 
     except Exception as e:
         error_msg = f"{translator.translate('startup_error_message', 'A critical error occurred during startup:')}\n{e}"
-        show_critical_error(
-            "startup_error_title", "Startup Error", error_msg, translator
-        )
+        show_critical_error("startup_error_title", "Startup Error", error_msg, translator)
         exit_code = 1
     finally:
         if is_first_instance and _instance_mutex_handle:

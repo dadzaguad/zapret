@@ -59,7 +59,7 @@ class CommandRunnerApp(QWidget):
     RUNNING_STYLE: str = "background-color: lightgreen; color: black;"
     DEFAULT_STYLE: str = ""
 
-    def __init__(self, zapret_runner: ZapretRunner):
+    def __init__(self):
         super().__init__()
 
         icon_path: str = resource_path("icon.ico")
@@ -103,7 +103,7 @@ class CommandRunnerApp(QWidget):
         self._command_buttons: dict[str, QPushButton] = {}
         self._running_command_name: Optional[str] = None
         self._pending_command: Optional[str] = None
-        self.zapret_runner: ZapretRunner = zapret_runner
+        self.zapret_runner: ZapretRunner = ZapretRunner()
 
         cmd_buttons_widget: QWidget = QWidget()
         cmd_layout: QVBoxLayout = QVBoxLayout()
