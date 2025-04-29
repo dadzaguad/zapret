@@ -38,7 +38,7 @@ class CommandWorker(QObject):
         try:
             self._zapret_runner.run(self._command_name)
             self.command_started.emit(self._command_name)
-        except (ValueError, RuntimeError) as e:
+        except Exception as e:
             self.error_occurred.emit(str(e), self._command_name)
         finally:
             self.finished.emit()

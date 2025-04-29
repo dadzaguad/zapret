@@ -19,5 +19,6 @@
     "profile_start": "Profile start",
     "error": "Error",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "uac_denied": "The user likely denied the UAC prompt."
 }
