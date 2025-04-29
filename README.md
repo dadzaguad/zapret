@@ -2,6 +2,7 @@
 
 [![Windows](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat&logo=windows)](https://www.microsoft.com/windows/)
 [![Latest Release](https://img.shields.io/github/v/release/dadzaguad/zapret?include_prereleases&label=latest%20release)](https://github.com/dadzaguad/zapret/releases)
+
 **GUI Zapret** - это графический интерфейс пользователя (GUI) **только для Windows**, созданный как удобная оболочка для проекта [**Zapret**](https://github.com/Flowseal/zapret-discord-youtube.git) (и используемой им утилиты `winws.exe`). Приложение упрощает запуск и остановку преднастроенных профилей команд для обхода DPI (Deep Packet Inspection) и восстановления доступа к сервисам (например, Discord, Google), которые могут блокироваться вашим интернет-провайдером.
 
 
